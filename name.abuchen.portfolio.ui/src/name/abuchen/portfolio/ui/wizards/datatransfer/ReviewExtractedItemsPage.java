@@ -64,6 +64,7 @@ import name.abuchen.portfolio.model.Portfolio;
 import name.abuchen.portfolio.model.PortfolioTransaction;
 import name.abuchen.portfolio.model.PortfolioTransferEntry;
 import name.abuchen.portfolio.model.Security;
+import name.abuchen.portfolio.model.Transaction;
 import name.abuchen.portfolio.money.Money;
 import name.abuchen.portfolio.money.Values;
 import name.abuchen.portfolio.ui.AbstractClientJob;
@@ -522,6 +523,16 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage
                 }
             });
         }
+
+        if (client.getActivePortfolios().size() > 1)
+        {
+            MenuManager subMenu = new MenuManager("Assign to portfolio", null);
+            for (Portfolio portfolio : client.getPortfolios())
+            {
+                subMenu.add(new AssignToPortfolioAction(portfolio));
+            }
+            manager.add(subMenu);
+        }
         
         if (client.getActiveAccounts().size() > 1)
         {
@@ -529,16 +540,6 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage
             for (Account account : client.getActiveAccounts())
             {
                 subMenu.add(new AssignToAccountAction(account));
-            }
-            manager.add(subMenu);
-        }
-        
-        if (client.getActivePortfolios().size() > 1)
-        {
-            MenuManager subMenu = new MenuManager("Assign to portfolio", null);
-            for (Portfolio portfolio : client.getPortfolios())
-            {
-                subMenu.add(new AssignToPortfolioAction(portfolio));
             }
             manager.add(subMenu);
         }
@@ -641,7 +642,8 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage
         {
             Item item = ((ExtractedEntry)entry).getItem();
             Annotated subject = item.getSubject();
-            if(subject instanceof BuySellEntry)
+            if(subject instanceof BuySellEntry ||
+               subject instanceof Transaction)
             {
                return true;
             } 
@@ -802,7 +804,12 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage
         {
             for (Object element : ((IStructuredSelection) tableViewer.getSelection()).toList())
             {
-                ((ExtractedEntry) element).setPortfolio(portfolio);
+                ExtractedEntry entry = (ExtractedEntry) element;
+                entry.setPortfolio(portfolio);
+                if (entry.getAccount() == null)
+                {
+                    entry.setAccount(portfolio.getReferenceAccount());
+                }
             }
             tableViewer.refresh();
         }
