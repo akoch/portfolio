@@ -18,10 +18,13 @@ import org.eclipse.jface.layout.GridLayoutFactory;
 import org.eclipse.jface.layout.TableColumnLayout;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnPixelData;
 import org.eclipse.jface.viewers.ColumnWeightData;
+import org.eclipse.jface.viewers.ComboBoxCellEditor;
 import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.StyledCellLabelProvider;
 import org.eclipse.jface.viewers.StyledString;
@@ -42,9 +45,12 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
 
 import name.abuchen.portfolio.datatransfer.Extractor;
+import name.abuchen.portfolio.datatransfer.Extractor.Item;
 import name.abuchen.portfolio.datatransfer.ImportAction;
+import name.abuchen.portfolio.datatransfer.ImportAction.Context;
 import name.abuchen.portfolio.datatransfer.actions.CheckCurrenciesAction;
 import name.abuchen.portfolio.datatransfer.actions.CheckValidTypesAction;
 import name.abuchen.portfolio.datatransfer.actions.DetectDuplicatesAction;
@@ -54,10 +60,12 @@ import name.abuchen.portfolio.model.AccountTransferEntry;
 import name.abuchen.portfolio.model.Annotated;
 import name.abuchen.portfolio.model.BuySellEntry;
 import name.abuchen.portfolio.model.Client;
+import name.abuchen.portfolio.model.Named;
 import name.abuchen.portfolio.model.Portfolio;
 import name.abuchen.portfolio.model.PortfolioTransaction;
 import name.abuchen.portfolio.model.PortfolioTransferEntry;
 import name.abuchen.portfolio.model.Security;
+import name.abuchen.portfolio.model.Transaction;
 import name.abuchen.portfolio.money.Money;
 import name.abuchen.portfolio.money.Values;
 import name.abuchen.portfolio.ui.AbstractClientJob;
@@ -68,7 +76,7 @@ import name.abuchen.portfolio.ui.util.FormDataFactory;
 import name.abuchen.portfolio.ui.util.LabelOnly;
 import name.abuchen.portfolio.ui.wizards.AbstractWizardPage;
 
-public class ReviewExtractedItemsPage extends AbstractWizardPage implements ImportAction.Context
+public class ReviewExtractedItemsPage extends AbstractWizardPage implements Context
 {
     /* package */static final String PAGE_ID = "reviewitems"; //$NON-NLS-1$
 
@@ -114,25 +122,21 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         return allEntries;
     }
 
-    @Override
     public Portfolio getPortfolio()
     {
         return (Portfolio) ((IStructuredSelection) primaryPortfolio.getSelection()).getFirstElement();
     }
 
-    @Override
     public Portfolio getSecondaryPortfolio()
     {
         return (Portfolio) ((IStructuredSelection) secondaryPortfolio.getSelection()).getFirstElement();
     }
 
-    @Override
     public Account getAccount()
     {
         return (Account) ((IStructuredSelection) primaryAccount.getSelection()).getFirstElement();
     }
 
-    @Override
     public Account getSecondaryAccount()
     {
         return (Account) ((IStructuredSelection) secondaryAccount.getSelection()).getFirstElement();
@@ -175,6 +179,7 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         secondaryAccount.setContentProvider(ArrayContentProvider.getInstance());
         secondaryAccount.setInput(client.getActiveAccounts());
         secondaryAccount.getControl().setVisible(false);
+        secondaryAccount.addSelectionChangedListener(e -> tableViewer.refresh());
 
         lblPrimaryPortfolio = new Label(targetContainer, SWT.NONE);
         lblPrimaryPortfolio.setText(Messages.ColumnPortfolio);
@@ -192,6 +197,7 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         secondaryPortfolio.setContentProvider(ArrayContentProvider.getInstance());
         secondaryPortfolio.setInput(client.getActivePortfolios());
         secondaryPortfolio.getControl().setVisible(false);
+        secondaryPortfolio.addSelectionChangedListener(e -> tableViewer.refresh());
 
         preselectDropDowns();
 
@@ -397,6 +403,123 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
             }
         });
         layout.setColumnData(column.getColumn(), new ColumnPixelData(250, true));
+
+        if (client.getActivePortfolios().size() > 1)
+        {
+            column = new TableViewerColumn(viewer, SWT.NONE);
+            column.getColumn().setText(Messages.ColumnPortfolio);
+            column.setEditingSupport(new PortfolioEditingSupport(viewer, client.getActivePortfolios()));
+            column.setLabelProvider(new FormattedLabelProvider()
+            {
+                @Override
+                public String getText(ExtractedEntry entry)
+                {
+                    if (isAccountPortfolioItem(entry))
+                    {
+                        return entry.getPortfolio().getName();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            });
+            layout.setColumnData(column.getColumn(), new ColumnPixelData(120, true));
+        }
+
+        if (client.getActiveAccounts().size() > 1)
+        {
+            column = new TableViewerColumn(viewer, SWT.NONE);
+            column.getColumn().setText(Messages.ColumnAccount);
+            column.setEditingSupport(new AccountEditingSupport(viewer, client.getActiveAccounts()));
+            column.setLabelProvider(new FormattedLabelProvider()
+            {
+                @Override
+                public String getText(ExtractedEntry entry)
+                {
+                    if (isAccountPortfolioItem(entry))
+                    {
+                        return entry.getAccount().getName();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            });
+            layout.setColumnData(column.getColumn(), new ColumnPixelData(120, true));
+        }
+    }
+
+    private void addTargetAccountColumn()
+    {
+        if (client.getActiveAccounts().size() > 1)
+        {
+            if (columnExists(Messages.ColumnAccountTarget)) { return; }
+            TableViewerColumn column = new TableViewerColumn(tableViewer, SWT.NONE);
+            column.getColumn().setText(Messages.ColumnAccountTarget);
+            column.setEditingSupport(new TargetAccountEditingSupport(tableViewer, client.getActiveAccounts()));
+            column.setLabelProvider(new FormattedLabelProvider()
+            {
+                @Override
+                public String getText(ExtractedEntry entry)
+                {
+                    if (isAccountTransferItem(entry))
+                    {
+                        return entry.getSecondaryAccount().getName();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            });
+            TableColumnLayout layout = (TableColumnLayout) tableViewer.getTable().getParent().getLayout();
+            layout.setColumnData(column.getColumn(), new ColumnPixelData(120, true));
+            tableViewer.refresh(true);
+        }
+    }
+
+    private void addTargetPortfolioColumn()
+    {
+        if (client.getActivePortfolios().size() > 1)
+        {
+            if (columnExists(Messages.ColumnPortfolioTarget)) { return; }
+            TableViewerColumn column = new TableViewerColumn(tableViewer, SWT.NONE);
+            column.getColumn().setText(Messages.ColumnPortfolioTarget);
+            column.setEditingSupport(new TargetPortfolioEditingSupport(tableViewer, client.getActivePortfolios()));
+            column.setLabelProvider(new FormattedLabelProvider()
+            {
+                @Override
+                public String getText(ExtractedEntry entry)
+                {
+                    if (isPortfolioTransferItem(entry))
+                    {
+                        return entry.getSecondaryPortfolio().getName();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            });
+            TableColumnLayout layout = (TableColumnLayout) tableViewer.getTable().getParent().getLayout();
+            layout.setColumnData(column.getColumn(), new ColumnPixelData(120, true));
+            tableViewer.refresh(true);
+        }
+    }
+
+    private boolean columnExists(String columnText)
+    {
+        for (TableColumn tableColumn : tableViewer.getTable().getColumns())
+        {
+            if (columnText.equals(tableColumn.getText()))
+            {
+                // column is already added
+                return true;
+            }
+        }
+        return false;
     }
 
     private void attachContextMenu(final Table table)
@@ -442,7 +565,7 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
                             .filter(s -> s.getCode() != ImportAction.Status.Code.OK) //
                             .forEach(s -> {
                                 Images image = s.getCode() == ImportAction.Status.Code.WARNING ? //
-                                                Images.WARNING : Images.ERROR;
+                                Images.WARNING : Images.ERROR;
                                 manager.add(new LabelOnly(s.getMessage(), image.descriptor()));
                             });
         }
@@ -476,6 +599,26 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
                 }
             });
         }
+
+        if (client.getActivePortfolios().size() > 1)
+        {
+            MenuManager subMenu = new MenuManager(Messages.LabelAssignToPortfolio, null);
+            for (Portfolio portfolio : client.getPortfolios())
+            {
+                subMenu.add(new AssignToPortfolioAction(portfolio));
+            }
+            manager.add(subMenu);
+        }
+
+        if (client.getActiveAccounts().size() > 1)
+        {
+            MenuManager subMenu = new MenuManager(Messages.LabelAssignToAccount, null);
+            for (Account account : client.getActiveAccounts())
+            {
+                subMenu.add(new AssignToAccountAction(account));
+            }
+            manager.add(subMenu);
+        }
     }
 
     @Override
@@ -500,7 +643,7 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
                     final List<Exception> errors = new ArrayList<Exception>();
                     List<ExtractedEntry> entries = extractor //
                                     .extract(files, errors).stream() //
-                                    .map(i -> new ExtractedEntry(i)) //
+                                    .map(i -> new ExtractedEntry(i, ReviewExtractedItemsPage.this)) //
                                     .collect(Collectors.toList());
 
                     // Logging them is not a bad idea if the whole method fails
@@ -539,11 +682,13 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
             {
                 lblSecondaryAccount.setVisible(true);
                 secondaryAccount.getControl().setVisible(true);
+                addTargetAccountColumn();
             }
             else if (entry.getItem() instanceof Extractor.PortfolioTransferItem)
             {
                 lblSecondaryPortfolio.setVisible(true);
                 secondaryPortfolio.getControl().setVisible(true);
+                addTargetPortfolioColumn();
             }
         }
     }
@@ -565,8 +710,43 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         {
             entry.clearStatus();
             for (ImportAction action : actions)
-                entry.addStatus(entry.getItem().apply(action, this));
+                entry.addStatus(entry.getItem().apply(action, entry));
         }
+    }
+
+    private boolean isAccountPortfolioItem(Object entry)
+    {
+        if (entry instanceof ExtractedEntry)
+        {
+            Item item = ((ExtractedEntry) entry).getItem();
+            Annotated subject = item.getSubject();
+            if (subject instanceof BuySellEntry || subject instanceof Transaction
+                            || subject instanceof AccountTransferEntry
+                            || subject instanceof PortfolioTransferEntry) { return true; }
+        }
+        return false;
+    }
+
+    private boolean isAccountTransferItem(Object entry)
+    {
+        if (entry instanceof ExtractedEntry)
+        {
+            Item item = ((ExtractedEntry) entry).getItem();
+            Annotated subject = item.getSubject();
+            if (subject instanceof AccountTransferEntry) { return true; }
+        }
+        return false;
+    }
+
+    private boolean isPortfolioTransferItem(Object entry)
+    {
+        if (entry instanceof ExtractedEntry)
+        {
+            Item item = ((ExtractedEntry) entry).getItem();
+            Annotated subject = item.getSubject();
+            if (subject instanceof PortfolioTransferEntry) { return true; }
+        }
+        return false;
     }
 
     static class FormattedLabelProvider extends StyledCellLabelProvider
@@ -606,6 +786,237 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
             cell.setImage(getImage(entry));
 
             super.update(cell);
+        }
+    }
+
+    private abstract class NamedEditingSupport<T extends Named> extends EditingSupport
+    {
+        private List<T> named;
+
+        public NamedEditingSupport(TableViewer viewer, List<T> named)
+        {
+            super(viewer);
+            this.named = named;
+        }
+
+        @Override
+        protected CellEditor getCellEditor(Object element)
+        {
+            String[] names = new String[named.size()];
+            int i = 0;
+            for (T namedElement : named)
+            {
+                names[i++] = namedElement.getName();
+            }
+            return new ComboBoxCellEditor(getViewer().getTable(), names);
+        }
+
+        @Override
+        protected boolean canEdit(Object element)
+        {
+            return named.size() > 1 && isCorrectItem(element);
+        }
+
+        protected abstract boolean isCorrectItem(Object element);
+
+        @Override
+        protected Object getValue(Object element)
+        {
+            return named.indexOf(element);
+        }
+
+        @Override
+        protected void setValue(Object element, Object value)
+        {
+            if (isCorrectItem(element))
+            {
+                ExtractedEntry entry = (ExtractedEntry) element;
+                int index = (int) value;
+                if (index >= 0 && named.size() >= index)
+                {
+                    T namedElement = named.get(index);
+                    doSetValue(entry, namedElement);
+                }
+                getViewer().update(entry, null);
+            }
+        }
+
+        protected abstract void doSetValue(ExtractedEntry entry, T namedElement);
+
+        @Override
+        public TableViewer getViewer()
+        {
+            return (TableViewer) super.getViewer();
+        }
+    }
+
+    private class AccountEditingSupport extends NamedEditingSupport<Account>
+    {
+        public AccountEditingSupport(TableViewer viewer, List<Account> named)
+        {
+            super(viewer, named);
+        }
+
+        @Override
+        protected boolean isCorrectItem(Object element)
+        {
+            return isAccountPortfolioItem(element);
+        }
+
+        @Override
+        protected void doSetValue(ExtractedEntry entry, Account account)
+        {
+            entry.setAccount(account);
+        }
+    }
+
+    private class TargetAccountEditingSupport extends NamedEditingSupport<Account>
+    {
+        public TargetAccountEditingSupport(TableViewer viewer, List<Account> named)
+        {
+            super(viewer, named);
+        }
+
+        @Override
+        protected boolean isCorrectItem(Object element)
+        {
+            return isAccountTransferItem(element);
+        }
+
+        @Override
+        protected void doSetValue(ExtractedEntry entry, Account account)
+        {
+            entry.setSecondaryAccount(account);
+        }
+    }
+
+    private class PortfolioEditingSupport extends NamedEditingSupport<Portfolio>
+    {
+        public PortfolioEditingSupport(TableViewer viewer, List<Portfolio> named)
+        {
+            super(viewer, named);
+        }
+
+        @Override
+        protected boolean isCorrectItem(Object element)
+        {
+            return isAccountPortfolioItem(element);
+        }
+
+        @Override
+        protected void doSetValue(ExtractedEntry entry, Portfolio portfolio)
+        {
+            entry.setPortfolio(portfolio);
+            // if no account is chosen, selecting a portfolio should choose the
+            // reference account
+            if (entry.getAccount() == null)
+            {
+                entry.setAccount(portfolio.getReferenceAccount());
+                getViewer().refresh();
+            }
+        }
+    }
+
+    private class TargetPortfolioEditingSupport extends NamedEditingSupport<Portfolio>
+    {
+        public TargetPortfolioEditingSupport(TableViewer viewer, List<Portfolio> named)
+        {
+            super(viewer, named);
+        }
+
+        @Override
+        protected boolean isCorrectItem(Object element)
+        {
+            return isPortfolioTransferItem(element);
+        }
+
+        @Override
+        protected void doSetValue(ExtractedEntry entry, Portfolio portfolio)
+        {
+            entry.setSecondaryPortfolio(portfolio);
+        }
+    }
+
+    abstract class AssignToNamedAction<T extends Named> extends Action
+    {
+        protected final T named;
+
+        public AssignToNamedAction(T named)
+        {
+            super(named.getName());
+            this.named = named;
+        }
+
+        protected abstract void setValue(ExtractedEntry entry);
+
+        @Override
+        public void run()
+        {
+            for (Object element : ((IStructuredSelection) tableViewer.getSelection()).toList())
+            {
+                setValue((ExtractedEntry) element);
+            }
+            tableViewer.refresh();
+        }
+    }
+
+    class AssignToAccountAction extends AssignToNamedAction<Account>
+    {
+        public AssignToAccountAction(Account account)
+        {
+            super(account);
+        }
+
+        @Override
+        public void setValue(ExtractedEntry entry)
+        {
+            entry.setAccount(named);
+        }
+    }
+
+    class AssignToPortfolioAction extends AssignToNamedAction<Portfolio>
+    {
+        public AssignToPortfolioAction(Portfolio portfolio)
+        {
+            super(portfolio);
+        }
+
+        @Override
+        public void setValue(ExtractedEntry entry)
+        {
+            entry.setPortfolio(named);
+            if (entry.getAccount() == null)
+            {
+                entry.setAccount(named.getReferenceAccount());
+            }
+        }
+    }
+
+    class AssignToTargetAccountAction extends AssignToNamedAction<Account>
+    {
+        public AssignToTargetAccountAction(Account account)
+        {
+            super(account);
+        }
+
+        @Override
+        public void setValue(ExtractedEntry entry)
+        {
+            entry.setSecondaryAccount(named);
+        }
+    }
+
+    class AssignToTargetPortfolioAction extends AssignToNamedAction<Portfolio>
+    {
+        public AssignToTargetPortfolioAction(Portfolio portfolio)
+        {
+            super(portfolio);
+        }
+
+        @Override
+        public void setValue(ExtractedEntry entry)
+        {
+            entry.setSecondaryPortfolio(named);
         }
     }
 }
