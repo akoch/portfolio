@@ -8,6 +8,8 @@ import name.abuchen.portfolio.datatransfer.Extractor;
 import name.abuchen.portfolio.datatransfer.Extractor.Item;
 import name.abuchen.portfolio.datatransfer.ImportAction;
 import name.abuchen.portfolio.datatransfer.ImportAction.Status;
+import name.abuchen.portfolio.model.Account;
+import name.abuchen.portfolio.model.Portfolio;
 
 public class ExtractedEntry
 {
@@ -16,6 +18,9 @@ public class ExtractedEntry
     private Boolean isImported = null;
     private Status.Code maxCode = Status.Code.OK;
     private List<Status> status = new ArrayList<>();
+    
+    private Account account;
+    private Portfolio portfolio;
 
     public ExtractedEntry(Item item)
     {
@@ -54,6 +59,26 @@ public class ExtractedEntry
     public Stream<Status> getStatus()
     {
         return this.status.stream();
+    }
+    
+    public Account getAccount()
+    {
+        return account;
+    }
+     
+    public void setAccount(Account account)
+    {
+        this.account = account;
+    }
+     
+    public Portfolio getPortfolio()
+    {
+        return portfolio;
+    }
+     
+    public void setPortfolio(Portfolio portfolio)
+    {
+        this.portfolio = portfolio;
     }
 
     public Status.Code getMaxCode()

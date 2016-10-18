@@ -18,10 +18,13 @@ import org.eclipse.jface.layout.GridLayoutFactory;
 import org.eclipse.jface.layout.TableColumnLayout;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnPixelData;
 import org.eclipse.jface.viewers.ColumnWeightData;
+import org.eclipse.jface.viewers.ComboBoxCellEditor;
 import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.StyledCellLabelProvider;
 import org.eclipse.jface.viewers.StyledString;
@@ -44,7 +47,9 @@ import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Table;
 
 import name.abuchen.portfolio.datatransfer.Extractor;
+import name.abuchen.portfolio.datatransfer.Extractor.Item;
 import name.abuchen.portfolio.datatransfer.ImportAction;
+import name.abuchen.portfolio.datatransfer.ImportAction.Context;
 import name.abuchen.portfolio.datatransfer.actions.CheckCurrenciesAction;
 import name.abuchen.portfolio.datatransfer.actions.CheckValidTypesAction;
 import name.abuchen.portfolio.datatransfer.actions.DetectDuplicatesAction;
@@ -54,6 +59,7 @@ import name.abuchen.portfolio.model.AccountTransferEntry;
 import name.abuchen.portfolio.model.Annotated;
 import name.abuchen.portfolio.model.BuySellEntry;
 import name.abuchen.portfolio.model.Client;
+import name.abuchen.portfolio.model.Named;
 import name.abuchen.portfolio.model.Portfolio;
 import name.abuchen.portfolio.model.PortfolioTransaction;
 import name.abuchen.portfolio.model.PortfolioTransferEntry;
@@ -68,7 +74,7 @@ import name.abuchen.portfolio.ui.util.FormDataFactory;
 import name.abuchen.portfolio.ui.util.LabelOnly;
 import name.abuchen.portfolio.ui.wizards.AbstractWizardPage;
 
-public class ReviewExtractedItemsPage extends AbstractWizardPage implements ImportAction.Context
+public class ReviewExtractedItemsPage extends AbstractWizardPage
 {
     /* package */static final String PAGE_ID = "reviewitems"; //$NON-NLS-1$
 
@@ -114,25 +120,21 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         return allEntries;
     }
 
-    @Override
     public Portfolio getPortfolio()
     {
         return (Portfolio) ((IStructuredSelection) primaryPortfolio.getSelection()).getFirstElement();
     }
 
-    @Override
     public Portfolio getSecondaryPortfolio()
     {
         return (Portfolio) ((IStructuredSelection) secondaryPortfolio.getSelection()).getFirstElement();
     }
 
-    @Override
     public Account getAccount()
     {
         return (Account) ((IStructuredSelection) primaryAccount.getSelection()).getFirstElement();
     }
 
-    @Override
     public Account getSecondaryAccount()
     {
         return (Account) ((IStructuredSelection) secondaryAccount.getSelection()).getFirstElement();
@@ -397,6 +399,50 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
             }
         });
         layout.setColumnData(column.getColumn(), new ColumnPixelData(250, true));
+        
+        column = new TableViewerColumn(viewer, SWT.NONE);
+        column.getColumn().setText(Messages.ColumnPortfolio);
+        List<Named> activePortfolios = new ArrayList<>(client.getActivePortfolios());
+        column.setEditingSupport(new DepotEditingSupport(viewer, activePortfolios));
+        column.setLabelProvider(new FormattedLabelProvider() {
+            @Override
+            public String getText(ExtractedEntry entry) {
+                if(isAccountPortfolioItem(entry))
+                {
+                    Portfolio portfolio = entry.getPortfolio();
+                    if(portfolio == null){
+                        return getPortfolio().getName();
+                    } else {
+                        return portfolio.getName();
+                    }
+                } else {
+                    return null;
+                }
+            }
+        });
+        layout.setColumnData(column.getColumn(), new ColumnPixelData(250, true));
+        
+        column = new TableViewerColumn(viewer, SWT.NONE);
+        column.getColumn().setText(Messages.ColumnAccount);
+        List<Named> activeAccounts = new ArrayList<>(client.getActiveAccounts());
+        column.setEditingSupport(new DepotEditingSupport(viewer, activeAccounts));
+        column.setLabelProvider(new FormattedLabelProvider() {
+            @Override
+            public String getText(ExtractedEntry entry) {
+                if(isAccountPortfolioItem(entry))
+                {
+                    Account account = entry.getAccount();
+                    if(account == null){
+                        return getAccount().getName();
+                    } else {
+                        return account.getName();
+                    }
+                } else {
+                    return null;
+                }
+            }
+        });
+        layout.setColumnData(column.getColumn(), new ColumnPixelData(250, true));
     }
 
     private void attachContextMenu(final Table table)
@@ -475,6 +521,26 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
                     tableViewer.refresh();
                 }
             });
+        }
+        
+        if (client.getActiveAccounts().size() > 1)
+        {
+            MenuManager subMenu = new MenuManager("Assign to account", null);
+            for (Account account : client.getActiveAccounts())
+            {
+                subMenu.add(new AssignToAccountAction(account));
+            }
+            manager.add(subMenu);
+        }
+        
+        if (client.getActivePortfolios().size() > 1)
+        {
+            MenuManager subMenu = new MenuManager("Assign to portfolio", null);
+            for (Portfolio portfolio : client.getPortfolios())
+            {
+                subMenu.add(new AssignToPortfolioAction(portfolio));
+            }
+            manager.add(subMenu);
         }
     }
 
@@ -565,8 +631,22 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
         {
             entry.clearStatus();
             for (ImportAction action : actions)
-                entry.addStatus(entry.getItem().apply(action, this));
+                entry.addStatus(entry.getItem().apply(action, getContext(entry)));
         }
+    }
+    
+    private boolean isAccountPortfolioItem(Object entry)
+    {
+        if(entry instanceof ExtractedEntry)
+        {
+            Item item = ((ExtractedEntry)entry).getItem();
+            Annotated subject = item.getSubject();
+            if(subject instanceof BuySellEntry)
+            {
+               return true;
+            } 
+        }
+        return false;
     }
 
     static class FormattedLabelProvider extends StyledCellLabelProvider
@@ -606,6 +686,171 @@ public class ReviewExtractedItemsPage extends AbstractWizardPage implements Impo
             cell.setImage(getImage(entry));
 
             super.update(cell);
+        }
+    }
+    
+    private class DepotEditingSupport extends EditingSupport
+    {
+        private List<Named> named;
+
+        public DepotEditingSupport(TableViewer viewer, List<Named> named)
+        {
+                super(viewer);
+                this.named = named;
+        }
+
+        @Override
+        protected CellEditor getCellEditor(Object element)
+        {
+            String[] accountNames = new String[named.size()];
+            int i = 0;
+            for (Named account : named)
+            {
+                accountNames[i++] = account.getName();
+            }
+            return new ComboBoxCellEditor(getViewer().getTable(), accountNames);
+        }
+
+        @Override
+        protected boolean canEdit(Object element)
+        {
+            return isAccountPortfolioItem(element) && named.size() > 1;
+        }
+
+        @Override
+        protected Object getValue(Object element)
+        {
+            return named.indexOf(element);
+        }
+
+        @Override
+        protected void setValue(Object element, Object value)
+        {
+            if(isAccountPortfolioItem(element))
+            {
+                ExtractedEntry entry = (ExtractedEntry) element;
+                int index = (int) value;
+                if(index >= 0 && named.size() >=  index){
+                    Named namedElement = named.get(index);
+                    if(namedElement instanceof Account){
+                        entry.setAccount((Account) namedElement);
+                    } else if(namedElement instanceof Portfolio){
+                        Portfolio portfolio = (Portfolio) namedElement;
+                        entry.setPortfolio(portfolio);
+                        // if no account is chosen, selecting a portfolio should choose the reference account
+                        if (entry.getAccount() == null)
+                        {
+                            entry.setAccount(portfolio.getReferenceAccount());
+                            getViewer().refresh();
+                        }
+                    }
+                }
+                getViewer().update(entry, null);
+            }
+        }
+        
+        @Override
+        public TableViewer getViewer()
+        {
+            return (TableViewer) super.getViewer();
+        }
+    }
+
+    public Context getContext(ExtractedEntry entry)
+    {
+        return new DefaultContext(
+                        entry.getAccount() == null ? getAccount() : entry.getAccount(),
+                        entry.getPortfolio() == null ? getPortfolio() : entry.getPortfolio(),
+                        getSecondaryAccount(), 
+                        getSecondaryPortfolio()
+                        );
+    }
+    
+    class AssignToAccountAction extends Action
+    {
+        private Account account;
+
+        public AssignToAccountAction(Account account)
+        {
+            super(account.getName());
+            this.account = account;
+        }
+        
+        @Override
+        public void run()
+        {
+            for (Object element : ((IStructuredSelection) tableViewer.getSelection()).toList())
+            {
+                ((ExtractedEntry) element).setAccount(account);
+            }
+            tableViewer.refresh();
+        }
+    }
+    
+    class AssignToPortfolioAction extends Action
+    {
+        private Portfolio portfolio;
+
+        public AssignToPortfolioAction(Portfolio portfolio)
+        {
+            super(portfolio.getName());
+            this.portfolio = portfolio;
+        }
+        
+        @Override
+        public void run()
+        {
+            for (Object element : ((IStructuredSelection) tableViewer.getSelection()).toList())
+            {
+                ((ExtractedEntry) element).setPortfolio(portfolio);
+            }
+            tableViewer.refresh();
+        }
+    }
+    
+    class DefaultContext implements Context
+    {
+
+        private Account account;
+        private Portfolio portfolio;
+        private Account secondAccount;
+        private Portfolio secondPortfolio;
+
+        public DefaultContext(Account account, Portfolio portfolio)
+        {
+           this(account, portfolio, null, null);
+        }
+        
+        public DefaultContext(Account account, Portfolio portfolio, Account secondAccount, Portfolio secondPortfolio)
+        {
+            this.account = account;
+            this.portfolio = portfolio;
+            this.secondAccount = secondAccount;
+            this.secondPortfolio = secondPortfolio;
+        }
+        
+        @Override
+        public Account getAccount()
+        {
+            return account;
+        }
+
+        @Override
+        public Portfolio getPortfolio()
+        {
+            return portfolio;
+        }
+
+        @Override
+        public Account getSecondaryAccount()
+        {
+            return secondAccount;
+        }
+
+        @Override
+        public Portfolio getSecondaryPortfolio()
+        {
+            return secondPortfolio;
         }
     }
 }
