@@ -63,7 +63,7 @@ public class ImportExtractedItemsWizard extends Wizard
         {
             if (entry.isImported())
             {
-                entry.getItem().apply(action, page);
+                entry.getItem().apply(action, entry);
                 isDirty = true;
             }
         }

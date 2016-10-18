@@ -151,7 +151,7 @@ public class CSVImportWizard extends Wizard
         {
             if (entry.isImported())
             {
-                entry.getItem().apply(action, reviewPage);
+                entry.getItem().apply(action, entry);
                 isDirty = true;
             }
         }

@@ -62,6 +62,7 @@ public class Messages extends NLS
     public static String ColumnAbsolutePerformancePercent_Option;
     public static String ColumnAccount;
     public static String ColumnAccountFrom;
+    public static String ColumnAccountTarget;
     public static String ColumnAccountTo;
     public static String ColumnActualPercent;
     public static String ColumnActualValue;
@@ -158,6 +159,7 @@ public class Messages extends NLS
     public static String ColumnPersonalDividendYield;
     public static String ColumnPersonalDividendYield_Description;
     public static String ColumnPortfolio;
+    public static String ColumnPortfolioTarget;
     public static String ColumnPreviousClose;
     public static String ColumnProfitLoss;
     public static String ColumnProfitLossBaseCurrency;
@@ -333,6 +335,8 @@ public class Messages extends NLS
     public static String LabelAllFiles;
     public static String LabelAllSecurities;
     public static String LabelAssetChart;
+    public static String LabelAssignToAccount;
+    public static String LabelAssignToPortfolio;
     public static String LabelAvailableAttributes;
     public static String LabelChartDetailDividends;
     public static String LabelChartDetailEvents;
