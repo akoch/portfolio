@@ -10,15 +10,15 @@ KAUF AM 21.09.2015  UM 12:45:38 FRANKFURT NR. 92612045.001
 Wertpapier WKN ISIN
 HELIAD EQ.PARTN.KGAA A0L1NN DE000A0L1NN5
 Einheit Umsatz
-ST 250,00000
+ST 2.500,00000
 Kurs 5,480000 EUR P.ST.  
-Kurswert EUR 1.370,00
+Kurswert EUR 13.700,00
 Börsenplatzgebühr EUR 2,95
 Handelsentgelt EUR 3,00
 Provision EUR 5,00
 Grundgebühr EUR 4,95
 Eig. Spesen EUR 1,95
-Wert 23.09.2015 EUR 1.387,85
+Wert 23.09.2015 EUR 13.717,85
 zulasten Konto-Nr. 111222333
 Wertpapiere zugunsten Girosammelverwahrung 
 Clearstream Bk Ffm 2126

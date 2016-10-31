@@ -501,9 +501,9 @@ public class ConsorsbankPDFExtractorTest
         assertThat(entry.getPortfolioTransaction().getType(), is(PortfolioTransaction.Type.BUY));
         assertThat(entry.getAccountTransaction().getType(), is(AccountTransaction.Type.BUY));
 
-        assertThat(entry.getPortfolioTransaction().getMonetaryAmount(), is(Money.of(CurrencyUnit.EUR, 1387_85L)));
+        assertThat(entry.getPortfolioTransaction().getMonetaryAmount(), is(Money.of(CurrencyUnit.EUR, 13717_85L)));
         assertThat(entry.getPortfolioTransaction().getDate(), is(LocalDate.parse("2015-09-23")));
-        assertThat(entry.getPortfolioTransaction().getShares(), is(Values.Share.factorize(250)));
+        assertThat(entry.getPortfolioTransaction().getShares(), is(Values.Share.factorize(2500)));
         assertThat(entry.getPortfolioTransaction().getUnitSum(Unit.Type.FEE), is(Money.of(CurrencyUnit.EUR, 17_85L)));
         assertThat(entry.getPortfolioTransaction().getGrossPricePerShare(), is(Quote.of(CurrencyUnit.EUR, Values.Quote.factorize(5.48))));
     }
