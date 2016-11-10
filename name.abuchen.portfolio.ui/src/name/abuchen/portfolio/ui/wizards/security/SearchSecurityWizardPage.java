@@ -2,8 +2,10 @@ package name.abuchen.portfolio.ui.wizards.security;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.eclipse.jface.layout.GridDataFactory;
@@ -44,11 +46,14 @@ public class SearchSecurityWizardPage extends WizardPage
 
     private ResultItem item;
 
-    public SearchSecurityWizardPage(Client client)
+    private String label;
+
+    public SearchSecurityWizardPage(Client client, String label)
     {
         super("searchpage"); //$NON-NLS-1$
+        this.label = label;
         setTitle(Messages.SecurityMenuAddNewSecurity);
-        setDescription(Messages.SecurityMenuAddNewSecurityDescription);
+        setDescription(MessageFormat.format(Messages.SecurityMenuAddNewSecurityDescription, label));
 
         this.client = client;
     }
@@ -95,10 +100,22 @@ public class SearchSecurityWizardPage extends WizardPage
         resultTable.getTable().setLinesVisible(true);
 
         final Set<String> existingSymbols = new HashSet<String>();
-        for (Security s : client.getSecurities())
-            existingSymbols.add(s.getTickerSymbol());
-
-        resultTable.setLabelProvider(new ResultItemLabelProvider(existingSymbols));
+        for (Security s : client.getSecurities()) {
+            String tickerSymbol = s.getTickerSymbol();
+            if (tickerSymbol != null) {
+                existingSymbols.add(tickerSymbol);
+            }
+        }
+        
+        final Set<String> existingWkns = new HashSet<String>();
+        for (Security s : client.getSecurities()) {
+            String wkn = s.getWkn();
+            if (wkn != null) {
+                existingWkns.add(wkn);
+            }
+        }
+        
+        resultTable.setLabelProvider(new ResultItemLabelProvider(existingSymbols, existingWkns));
         resultTable.setContentProvider(ArrayContentProvider.getInstance());
 
         searchBox.addTraverseListener(new TraverseListener()
@@ -126,8 +143,7 @@ public class SearchSecurityWizardPage extends WizardPage
             public void selectionChanged(SelectionChangedEvent event)
             {
                 item = (ResultItem) ((IStructuredSelection) event.getSelection()).getFirstElement();
-                setPageComplete(item != null && item.getSymbol() != null
-                                && !existingSymbols.contains(item.getSymbol()));
+                setPageComplete(item != null && !existingSymbols.contains(item.getSymbol()) && !existingWkns.contains(item.getWkn()));
             }
         });
 
@@ -146,9 +162,11 @@ public class SearchSecurityWizardPage extends WizardPage
             getContainer().run(true, false, m -> {
                 try
                 {
-                    SecuritySearchProvider provider = Factory.getSearchProvider().get(0);
-                    List<ResultItem> result = provider.search(query);
-                    Display.getDefault().asyncExec(() -> resultTable.setInput(result));
+                    Optional<SecuritySearchProvider> provider = Factory.getSearchProvider().stream().filter(p -> p.getName().equals(label)).findFirst();
+                    if(provider.isPresent()) {
+                        List<ResultItem> result = provider.get().search(query);
+                        Display.getDefault().asyncExec(() -> resultTable.setInput(result));
+                    }
                 }
                 catch (IOException e)
                 {
@@ -167,10 +185,12 @@ public class SearchSecurityWizardPage extends WizardPage
                     implements ITableLabelProvider, ITableColorProvider
     {
         private final Set<String> symbols;
+        private final Set<String> existingWkns;
 
-        public ResultItemLabelProvider(Set<String> symbols)
+        public ResultItemLabelProvider(Set<String> symbols, Set<String> existingWkns)
         {
             this.symbols = symbols;
+            this.existingWkns = existingWkns;
         }
 
         @Override
@@ -212,7 +232,7 @@ public class SearchSecurityWizardPage extends WizardPage
 
             if (item.getSymbol() == null)
                 return Display.getCurrent().getSystemColor(SWT.COLOR_DARK_GRAY);
-            else if (symbols.contains(item.getSymbol()))
+            else if (symbols.contains(item.getSymbol()) || existingWkns.contains(item.getWkn()))
                 return Display.getCurrent().getSystemColor(SWT.COLOR_GRAY);
             else
                 return null;

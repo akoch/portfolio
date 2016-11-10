@@ -12,6 +12,7 @@ public interface SecuritySearchProvider
         private String symbol;
         private String name;
         private String isin;
+        private String wkn;
         private long lastTrade;
         private String type;
         private String exchange;
@@ -24,6 +25,16 @@ public interface SecuritySearchProvider
         public void setSymbol(String symbol)
         {
             this.symbol = symbol;
+        }
+        
+        public String getWkn()
+        {
+            return wkn;
+        }
+        
+        public void setWkn(String wkn)
+        {
+            this.wkn = wkn;
         }
 
         public String getName()

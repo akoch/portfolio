@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
 
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.Test;
@@ -15,7 +17,7 @@ import name.abuchen.portfolio.money.Values;
 import name.abuchen.portfolio.online.SecuritySearchProvider.ResultItem;
 
 @SuppressWarnings("nls")
-public class YahooSearchProviderTest
+public class OnVistaSearchProviderTest
 {
 
     @Test
@@ -23,12 +25,12 @@ public class YahooSearchProviderTest
     {
         // search: https://de.finance.yahoo.com/lookup?s=BASF*&t=A&b=0&m=ALL
 
-        try (Scanner scanner = new Scanner(getClass().getResourceAsStream("response_yahoo_search.txt"), "UTF-8"))
+        try (Scanner scanner = new Scanner(getClass().getResourceAsStream("response_onvista_search.txt"), "UTF-8"))
         {
             String html = scanner.useDelimiter("\\A").next();
-            Document document = Jsoup.parse(html);
+            JSONObject jsonObject= (JSONObject) JSONValue.parse(html);
 
-            List<ResultItem> items = new YahooSearchProvider().extractFrom(document);
+            List<ResultItem> items = new OnVistaSearchProvider().extractFrom(jsonObject);
 
             assertThat(items.size(), equalTo(20));
 

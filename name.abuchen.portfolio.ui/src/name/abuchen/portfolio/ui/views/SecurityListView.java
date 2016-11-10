@@ -1,5 +1,6 @@
 package name.abuchen.portfolio.ui.views;
 
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +58,8 @@ import name.abuchen.portfolio.money.ExchangeRateProviderFactory;
 import name.abuchen.portfolio.money.Quote;
 import name.abuchen.portfolio.money.Values;
 import name.abuchen.portfolio.online.QuoteFeed;
+import name.abuchen.portfolio.online.impl.OnVistaQuoteFeed;
+import name.abuchen.portfolio.online.impl.YahooFinanceQuoteFeed;
 import name.abuchen.portfolio.ui.Images;
 import name.abuchen.portfolio.ui.Messages;
 import name.abuchen.portfolio.ui.PortfolioPart;
@@ -77,7 +80,7 @@ import name.abuchen.portfolio.ui.util.viewers.ShowHideColumnHelper;
 import name.abuchen.portfolio.ui.util.viewers.ValueEditingSupport;
 import name.abuchen.portfolio.ui.views.columns.NoteColumn;
 import name.abuchen.portfolio.ui.wizards.security.EditSecurityDialog;
-import name.abuchen.portfolio.ui.wizards.security.SearchYahooWizard;
+import name.abuchen.portfolio.ui.wizards.security.SearchSecurityWizard;
 
 public class SecurityListView extends AbstractListView implements ModificationListener
 {
@@ -102,12 +105,28 @@ public class SecurityListView extends AbstractListView implements ModificationLi
                 }
             });
 
-            manager.add(new Action(Messages.SecurityMenuSearchYahoo)
+            manager.add(new Action(MessageFormat.format(Messages.SecurityMenuSearchMenu, "Yahoo Finance"))
             {
                 @Override
                 public void run()
                 {
-                    SearchYahooWizard wizard = new SearchYahooWizard(getClient());
+                    SearchSecurityWizard wizard = new SearchSecurityWizard(getClient(), "Yahoo Finance", YahooFinanceQuoteFeed.ID);
+                    Dialog dialog = new WizardDialog(getToolBar().getShell(), wizard);
+
+                    if (dialog.open() == Dialog.OK)
+                    {
+                        Security newSecurity = wizard.getSecurity();
+                        openEditDialog(newSecurity);
+                    }
+                }
+            });
+            
+            manager.add(new Action(MessageFormat.format(Messages.SecurityMenuSearchMenu, "OnVista"))
+            {
+                @Override
+                public void run()
+                {
+                    SearchSecurityWizard wizard = new SearchSecurityWizard(getClient(), "OnVista", OnVistaQuoteFeed.ID);
                     Dialog dialog = new WizardDialog(getToolBar().getShell(), wizard);
 
                     if (dialog.open() == Dialog.OK)

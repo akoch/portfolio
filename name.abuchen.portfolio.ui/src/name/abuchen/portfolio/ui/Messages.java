@@ -616,7 +616,7 @@ public class Messages extends NLS
     public static String SecurityMenuNewSecurity;
     public static String SecurityMenuQuotes;
     public static String SecurityMenuRemoveFromWatchlist;
-    public static String SecurityMenuSearchYahoo;
+    public static String SecurityMenuSearchMenu;
     public static String SecurityMenuSell;
     public static String SecurityMenuStockSplit;
     public static String SecurityMenuTransfer;
